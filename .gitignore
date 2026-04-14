@@ -1,0 +1,6 @@
+*.class
+resultado_sala_*.xml
+.project
+.classpath
+.settings/
+bin/

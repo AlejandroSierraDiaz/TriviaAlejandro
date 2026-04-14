@@ -1,63 +1,89 @@
+import java.io.*;
 import java.util.*;
 
-public class Partida {
+public class Partida extends Thread {
 
-    static Pregunta[] preguntas = {
-        new Pregunta("¿Cual es la capital de Francia?", "a) Madrid", "b) Paris", "c) Roma", "d) Berlin", "b"),
-        new Pregunta("¿Cuantos planetas tiene el sistema solar?", "a) 7", "b) 9", "c) 8", "d) 10", "c"),
-        new Pregunta("¿En que anio llego el hombre a la Luna?", "a) 1965", "b) 1969", "c) 1972", "d) 1960", "b"),
-        new Pregunta("¿Cual es el oceano mas grande del mundo?", "a) Atlantico", "b) Indico", "c) Artico", "d) Pacifico", "d"),
-        new Pregunta("¿Que lenguaje de programacion creo James Gosling?", "a) Python", "b) C++", "c) Java", "d) JavaScript", "c")
-    };
-
+    private List<ClientHandler> jugadores;
+    private List<Pregunta> preguntas;
     static int TIEMPO_RESPUESTA = 15;
+    private int idSala;
 
-    public static void iniciar(List<ClientHandler> jugadores) {
-        System.out.println("\n=== COMIENZA LA TRIVIA con " + jugadores.size() + " jugador(es) ===");
-        enviarATodos(jugadores, "INICIO|La trivia va a comenzar! " + jugadores.size() + " jugador(es) conectados.");
+    public Partida(List<ClientHandler> jugadoresJugando, int idSala) {
+        this.jugadores = jugadoresJugando;
+        this.idSala = idSala;
+        this.preguntas = new ArrayList<>();
+    }
+
+    @Override
+    public void run() {
+        cargarPreguntas(); 
+        
+        // --- MEJORA 4: Desordenar preguntas ---
+        Collections.shuffle(preguntas);
+
+        System.out.println("\n=== SALA " + idSala + " COMIENZA con " + jugadores.size() + " jugador(es) ===");
+        enviarATodos("INICIO|La trivia va a comenzar! Estas en la Sala " + idSala);
         esperar(3000);
 
-        for (int i = 0; i < preguntas.length; i++) {
-            jugarPregunta(jugadores, preguntas[i], i + 1);
+        for (int i = 0; i < preguntas.size(); i++) {
+            jugarPregunta(preguntas.get(i), i + 1);
 
-            if (i < preguntas.length - 1) {
+            if (i < preguntas.size() - 1) {
                 esperar(3000);
             }
         }
 
-        // Ranking final
-        String rankingFinal = construirRankingFinal(jugadores);
-        System.out.println("\n" + rankingFinal.replace(";;", "\n"));
-        enviarATodos(jugadores, "FIN|" + rankingFinal);
+        String rankingFinal = construirRankingFinal();
+        System.out.println("\n[Sala " + idSala + "]" + rankingFinal.replace(";;", "\n"));
+        enviarATodos("FIN|" + rankingFinal);
 
-        // Cerrar conexiones
+        // --- MEJORA 5: Guardar informe de partida en XML ---
+        guardarResultadosXML();
+
         esperar(2000);
         for (int j = 0; j < jugadores.size(); j++) {
             jugadores.get(j).cerrar();
         }
-        System.out.println("Partida finalizada.");
+        System.out.println("Sala " + idSala + " finalizada. Informe XML generado.");
     }
 
-    public static void jugarPregunta(List<ClientHandler> jugadores, Pregunta pregunta, int numPregunta) {
-        // Resetear respuestas
+    private void cargarPreguntas() {
+        try (BufferedReader br = new BufferedReader(new FileReader("preguntas.txt"))) {
+            String linea;
+            while ((linea = br.readLine()) != null) {
+                String[] datos = linea.split(";");
+                if (datos.length >= 6) {
+                    preguntas.add(new Pregunta(datos[0], datos[1], datos[2], datos[3], datos[4], datos[5]));
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("No se pudo cargar la base de datos de preguntas.txt en Sala " + idSala);
+        }
+    }
+
+    private void jugarPregunta(Pregunta pregunta, int numPregunta) {
         for (int j = 0; j < jugadores.size(); j++) {
             jugadores.get(j).resetRespuesta();
         }
 
-        // Construir mensaje de pregunta
         String msgPregunta = "PREGUNTA|" + numPregunta + "|" + pregunta.texto
                 + "|" + pregunta.opcionA + "|" + pregunta.opcionB
                 + "|" + pregunta.opcionC + "|" + pregunta.opcionD;
 
-        enviarATodos(jugadores, msgPregunta);
-        System.out.println("\nPregunta " + numPregunta + ": " + pregunta.texto);
-        System.out.println("Esperando respuestas... (" + TIEMPO_RESPUESTA + " segundos)");
+        enviarATodos(msgPregunta);
+        System.out.println("[Sala " + idSala + "] Pregunta " + numPregunta + " enviada.");
 
-        // Esperar respuestas con contador (cada iteracion = 500ms)
         int esperaMaxima = TIEMPO_RESPUESTA * 2;
         int iteraciones = 0;
 
         while (iteraciones < esperaMaxima) {
+            
+            // --- MEJORA 6: Enviar temporizador de forma regular a los clientes (cada segundo) ---
+            if (iteraciones % 2 == 0) {
+                int segRestantes = TIEMPO_RESPUESTA - (iteraciones / 2);
+                enviarATodos("TIK|" + segRestantes);
+            }
+
             boolean todosRespondieron = true;
             for (int j = 0; j < jugadores.size(); j++) {
                 if (!jugadores.get(j).haRespondido()) {
@@ -66,21 +92,18 @@ public class Partida {
                 }
             }
             if (todosRespondieron) {
-                System.out.println("Todos los jugadores han respondido.");
                 break;
             }
             esperar(500);
             iteraciones++;
         }
 
-        // Cerrar recepcion de respuestas
         for (int j = 0; j < jugadores.size(); j++) {
             jugadores.get(j).aceptarRespuesta = false;
         }
 
-        enviarATodos(jugadores, "TIEMPO|Se acabo el tiempo!");
+        enviarATodos("TIEMPO|Se acabo el tiempo!");
 
-        // Evaluar respuestas
         for (int j = 0; j < jugadores.size(); j++) {
             ClientHandler jugador = jugadores.get(j);
             String resp = jugador.getRespuesta();
@@ -89,25 +112,52 @@ public class Partida {
             }
         }
 
-        // Enviar respuesta correcta
-        enviarATodos(jugadores, "CORRECTA|La respuesta correcta era: " + pregunta.correcta + ") " + pregunta.getTextoOpcion(pregunta.correcta));
+        enviarATodos("CORRECTA|La respuesta correcta era: " + pregunta.correcta + ") " + pregunta.getTextoOpcion(pregunta.correcta));
 
-        // Construir y enviar ranking
-        String ranking = construirRanking(jugadores, numPregunta);
-        System.out.println(ranking.replace(";;", "\n"));
-        enviarATodos(jugadores, "RANKING|" + ranking);
+        String ranking = construirRanking(numPregunta);
+        enviarATodos("RANKING|" + ranking);
     }
 
-    public static void enviarATodos(List<ClientHandler> jugadores, String mensaje) {
+    private void guardarResultadosXML() {
+        String nombreFichero = "resultado_sala_" + idSala + ".xml";
+        try (PrintWriter writer = new PrintWriter(new FileWriter(nombreFichero))) {
+            writer.println("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+            writer.println("<partida id_sala=\"" + idSala + "\">");
+            
+            List<ClientHandler> ordenados = new ArrayList<>();
+            for (int i = 0; i < jugadores.size(); i++) {
+                ordenados.add(jugadores.get(i));
+            }
+            ordenarPorPuntuacion(ordenados);
+
+            writer.println("    <jugadores>");
+            for (int i = 0; i < ordenados.size(); i++) {
+                ClientHandler j = ordenados.get(i);
+                writer.println("        <jugador posicion=\"" + (i+1) + "\">");
+                writer.println("            <nick>" + j.nick + "</nick>");
+                writer.println("            <puntuacion>" + j.puntuacion + "</puntuacion>");
+                writer.println("            <termino_desconectado>" + j.desconectado + "</termino_desconectado>");
+                writer.println("        </jugador>");
+            }
+            writer.println("    </jugadores>");
+            writer.println("</partida>");
+        } catch (IOException e) {
+            System.err.println("Error al guardar XML: " + e.getMessage());
+        }
+    }
+
+    private void enviarATodos(String mensaje) {
         for (int i = 0; i < jugadores.size(); i++) {
             jugadores.get(i).enviarMensaje(mensaje);
         }
     }
 
-    public static String construirRanking(List<ClientHandler> jugadores, int numPregunta) {
+    private String construirRanking(int numPregunta) {
         List<ClientHandler> ordenados = new ArrayList<>();
         for (int i = 0; i < jugadores.size(); i++) {
-            ordenados.add(jugadores.get(i));
+            if(!jugadores.get(i).desconectado) { 
+                ordenados.add(jugadores.get(i));
+            }
         }
         ordenarPorPuntuacion(ordenados);
 
@@ -118,10 +168,12 @@ public class Partida {
         return resultado;
     }
 
-    public static String construirRankingFinal(List<ClientHandler> jugadores) {
+    private String construirRankingFinal() {
         List<ClientHandler> ordenados = new ArrayList<>();
         for (int i = 0; i < jugadores.size(); i++) {
-            ordenados.add(jugadores.get(i));
+            if(!jugadores.get(i).desconectado) {
+                ordenados.add(jugadores.get(i));
+            }
         }
         ordenarPorPuntuacion(ordenados);
 
@@ -129,11 +181,13 @@ public class Partida {
         for (int i = 0; i < ordenados.size(); i++) {
             resultado += ";;" + (i + 1) + ". " + ordenados.get(i).nick + " - " + ordenados.get(i).puntuacion + " punto(s)";
         }
-        resultado += ";;;;Ganador: " + ordenados.get(0).nick + " con " + ordenados.get(0).puntuacion + " punto(s)!";
+        if(ordenados.size() > 0) {
+            resultado += ";;;;Ganador: " + ordenados.get(0).nick + " con " + ordenados.get(0).puntuacion + " punto(s)!";
+        }
         return resultado;
     }
 
-    public static void ordenarPorPuntuacion(List<ClientHandler> lista) {
+    private void ordenarPorPuntuacion(List<ClientHandler> lista) {
         for (int i = 0; i < lista.size() - 1; i++) {
             int maxIdx = i;
             for (int j = i + 1; j < lista.size(); j++) {
@@ -147,11 +201,9 @@ public class Partida {
         }
     }
 
-    public static void esperar(int milisegundos) {
+    private void esperar(int milisegundos) {
         try {
             Thread.sleep(milisegundos);
-        } catch (InterruptedException e) {
-            // Interrupcion ignorada
-        }
+        } catch (InterruptedException e) { }
     }
 }

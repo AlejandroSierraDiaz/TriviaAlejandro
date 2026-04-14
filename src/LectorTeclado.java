@@ -9,17 +9,10 @@ public class LectorTeclado extends Thread {
             String linea;
             while ((linea = teclado.readLine()) != null) {
                 if (linea.equalsIgnoreCase("START")) {
-                    if (Servidor.jugadores.size() == 0) {
-                        System.out.println("No hay jugadores conectados. Esperando...");
-                    } else {
-                        Servidor.partidaIniciada = true;
-                        try {
-                            Servidor.server.close();
-                        } catch (IOException e) {
-                            System.err.println("Error al cerrar servidor");
-                        }
-                        break;
-                    }
+                    Servidor.iniciarSala();
+                } else if (linea.equalsIgnoreCase("EXIT")) {
+                    System.out.println("Apagando Servidor...");
+                    System.exit(0);
                 }
             }
         } catch (IOException e) {

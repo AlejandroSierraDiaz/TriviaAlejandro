@@ -44,6 +44,13 @@ public class LectorServidor extends Thread {
                         System.out.print("Tu respuesta (a/b/c/d): ");
                     }
 
+                } else if (mensaje.startsWith("TIK|")) {
+                    // Muestra el tiempo restante solo en múltiplos de 5 para no hacer spam en la consola
+                    int seg = Integer.parseInt(mensaje.substring(4));
+                    if (seg % 5 == 0 && seg > 0) {
+                        System.out.println("   [Quedan " + seg + " segundos...]");
+                    }
+
                 } else if (mensaje.startsWith("TIEMPO|")) {
                     String texto = mensaje.substring("TIEMPO|".length());
                     System.out.println("\n** " + texto + " **");

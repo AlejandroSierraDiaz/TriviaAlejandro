@@ -1,0 +1,5 @@
+¿Cual es la capital de Francia?;a) Madrid;b) Paris;c) Roma;d) Berlin;b
+¿Cuantos planetas tiene el sistema solar?;a) 7;b) 9;c) 8;d) 10;c
+¿En que anio llego el hombre a la Luna?;a) 1965;b) 1969;c) 1972;d) 1960;b
+¿Cual es el oceano mas grande del mundo?;a) Atlantico;b) Indico;c) Artico;d) Pacifico;d
+¿Que lenguaje de programacion creo James Gosling?;a) Python;b) C++;c) Java;d) JavaScript;c

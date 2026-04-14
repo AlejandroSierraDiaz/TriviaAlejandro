@@ -11,6 +11,7 @@ public class ClientHandler extends Thread {
     private String respuesta;
     private boolean respondido;
     boolean aceptarRespuesta;
+    public boolean desconectado; // <--- MEJORA 2: Control de caídas
 
     public ClientHandler(Socket socket) {
         this.cliente = socket;
@@ -18,6 +19,7 @@ public class ClientHandler extends Thread {
         this.respuesta = null;
         this.respondido = false;
         this.aceptarRespuesta = false;
+        this.desconectado = false;
     }
 
     @Override
@@ -26,10 +28,9 @@ public class ClientHandler extends Thread {
             in = new BufferedReader(new InputStreamReader(cliente.getInputStream()));
             out = new PrintWriter(cliente.getOutputStream(), true);
 
-            // El primer mensaje del cliente es su nick
             nick = in.readLine();
+            if(nick == null) throw new IOException("Nick nulo"); // Desconexion prematura
 
-            // Bucle de lectura de respuestas
             String linea;
             while ((linea = in.readLine()) != null) {
                 if (linea.startsWith("RESPUESTA|") && aceptarRespuesta) {
@@ -42,21 +43,32 @@ public class ClientHandler extends Thread {
                 }
             }
 
+            // Si sale del while, el cliente cerro la conexion
+            marcarDesconectado();
+
         } catch (IOException e) {
-            System.out.println("Jugador " + nick + " desconectado.");
+            marcarDesconectado();
+            System.out.println("Jugador " + nick + " desconectado abruptamente.");
         }
     }
 
+    private void marcarDesconectado() {
+        this.desconectado = true;
+        this.respondido = true; // Auto-responder para no bloquear el bucle de la partida
+    }
+
     public void enviarMensaje(String mensaje) {
-        if (out != null) {
+        if (out != null && !desconectado) {
             out.println(mensaje);
         }
     }
 
     public void resetRespuesta() {
-        respuesta = null;
-        respondido = false;
-        aceptarRespuesta = true;
+        if(!desconectado) {
+            respuesta = null;
+            respondido = false;
+            aceptarRespuesta = true;
+        }
     }
 
     public boolean haRespondido() {
@@ -69,7 +81,7 @@ public class ClientHandler extends Thread {
 
     public void cerrar() {
         try {
-            if (cliente != null) {
+            if (cliente != null && !cliente.isClosed()) {
                 cliente.close();
             }
         } catch (IOException e) {
