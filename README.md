@@ -1,10 +1,10 @@
-# TriviaAlejandro - Servidor de Preguntas y Respuestas 🚀
+# TriviaAlejandro - Servidor de Preguntas y Respuestas 
 
 Un excelente servidor basado 100% en Java puro y Arquitectura Cliente-Servidor mediante **TCP Sockets y Concurrencia (Multihilo)**. El proyecto simula una sala de juegos "Trivia" completamente en vivo, capaz de mantener partidas simultáneas, control de interfaz y temporizadores asíncronos.
 
 ---
 
-### 🔥 Características Principales (7 Grandes Mejoras)
+###  Características Principales (7 Grandes Mejoras)
 
 1. **Frontend Swing (Modo Oscuro):** Interfaz gráfica interactiva y visual atractiva, en `ClienteGUI`, que sustituye los comandos de texto por ventanas estéticas usando puramente componentes nativos de Java (`javax.swing`).
 2. **Tic-Tac en Tiempo Real:** El servidor bombardea una señal (`TIK|<ms>`) para que la pantalla de los clientes dibuje una cuenta regresiva que incrementa la tensión del juego.
